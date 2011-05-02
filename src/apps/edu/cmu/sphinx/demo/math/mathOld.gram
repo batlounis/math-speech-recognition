@@ -1,0 +1,84 @@
+#JSGF V1.0;
+
+//grammar edu.cmu.sphinx.demo.jsapi.math.math_New;
+//NOTE REMEMBER TO SET TAG STRING back to null
+//NOTE GIVE OPTION TO SKIP
+//NOTE ASSUME TERM IF USER SAYS NOTHING
+//TIMER to move on?
+//send back if it was a term or command using variable termTest
+public <equation> = (<term>{appObj.setLastCommand("term");}|<commandOP>{appObj.setLastCommand("commandOP");}) {appObj.updateEquation($.$value,$,appObj.Backslash());}|<goBack>{appObj.undo(appObj.getLastCommand());}|<regroup>|<skip>;
+
+<goBack> = (go back| return | undo) {this.Return = "true"}{appObj.IsReturn(this.Return);};//Note: this doesn't change isTerm's prev value
+<skip> = skip {appObj.skip();};
+/* NUMBERS AND VARIABLES */
+<0to9> = one {this.$value = "1"}
+	| two {this.$value = "2"}
+	| three {this.$value = "3"}
+	| four {this.$value = "4"}
+	| five {this.$value = "5"}
+	| six {this.$value = "6"}
+	| seven {this.$value = "7"}
+	| eight {this.$value = "8"}
+	| nine {this.$value = "9"}
+	| zero {this.$value = "0"};
+
+<10to19> = Ten {this.$value = "10"}
+	| eleven {this.$value = "11"}
+	| twelve {this.$value = "12"}
+	| thirteen {this.$value = "13"}
+	| fourteen {this.$value = "14"}
+	| fifteen {this.$value = "15"}
+	| sixteen {this.$value = "16"}
+	| seventeen {this.$value = "17"}
+	| eighteen {this.$value = "18"}
+	| nineteen {this.$value = "19"};
+<tens> = twenty {this.$value = "2"}
+	| thirty {this.$value = "3"}
+	| forty {this.$value = "4"}
+	| fifty {this.$value = "5"}
+	| sixty {this.$value = "6"}
+	| seventy {this.$value = "7"}
+	| eighty {this.$value = "8"}
+	| ninety {this.$value = "9"};
+<20to99> = <tens> {this.$value = $tens.$value + "0"}
+	| <tens><0to9> {this.$value = $tens.$value + $0to9.$value};
+
+<number> = <0to9> {this.$value = $0to9.$value}| <10to19> {this.$value = $10to19.$value}| <20to99>{this.$value = $20to99.$value};
+<variable> = a | b | c | f | x | y | z;
+<nv> = (<number>|<variable>){this.$value = $.$value}
+	|<number><variable>{this.$value = $.$value};
+/* END OF NUMBERS & VARIABLES */
+
+/* SIMPLE OPERATIONS */
+<operation> = plus {this.$value = "+"} | minus {this.$value = "-"} | times {this.$value = "*"}|<power>{this.$value = "^"};
+<division> = over | divided by;
+<power> = to the {this.$value = "^"}| to the power {this.$value = "^"};
+<inverse_square_cube> = inverse{this.$value = "^\{-1\}"} |squared {this.$value = "^2"}| cubed {this.$value = "^3"};
+/* END OF SIMPLE OPERATIONS */
+
+/* TERMS */
+<term> = (<nv>{this.$value = $.$value}{appObj.setBackslash(false);}
+	|<nv>{this.$value = $.$value}<operation>{this.$value = this.$value + $.$value}<nv>{this.$value = this.$value + $.$value}{appObj.setBackslash(false);}
+	|<nv>{this.nv1 = $.$value}<division><nv>{this.$value = "frac\{" + this.nv1 + "\}\{" +  $nv.$value +"\}"}{appObj.setBackslash(true);}
+	|<nv><inverse_square_cube>{this.$value = $nv.$value + $.$value}{appObj.setBackslash(false);})
+	{this.termTest = "true"}{this.Return = "false"}{appObj.IsTerm(this.termTest);appObj.IsReturn(this.Return);};
+/* END OF TERMS */
+//all of it operator: groups term
+//group left term
+<regroup> = all of it (<operation>|<inverse_square_cube>){this.$value = $.$value}(<nv>{this.$value = this.$value + $.$value}|term{this.$value = this.$value + "\{\}"}){appObj.regroup(this.$value,false,false);}
+|all of it <division>(<nv>{this.$value = "\{" + $nv.$value + "\}"}{appObj.regroup(this.$value,true,true);}|term{this.$value = "\{\}"}
+{appObj.regroup(this.$value,true,false);})
+|all of it (<operation>|<inverse_square_cube>){this.$value = $.$value}{this.$value = this.$value + "\{\}"}{appObj.regroup(this.$value,false,false);}
+|all of it <division>{this.$value = "\{\}"}{appObj.regroup(this.$value,true,false);};
+/* MIXED TERMS */
+/* END OF MIXED TERMS */
+
+/* COMMAND OPERATION */
+<fraction> = (fraction {this.$value = "frac\{a\}\{b\}"}|<nv> <division> term{this.$value = "frac\{"+ $nv +"\}\{\}" }){appObj.setBackslash(true);};
+<exponent> = (<nv>(to the | to the power) term {this.$value = $nv + "^\{\}"})|(power|exponent){this.$value = "\{\}^\{\}"}{appObj.setBackslash(false);};
+<integral> = (integral {this.$value = "int\{\}\{\}"}| bounded integral{this.$value = "\\int_\{\}^\{\}\{\}\{\}"}){appObj.setBackslash(true);};
+<d> = d (<nv>{this.$value = "d" + $.$value}|term{this.$value = "d\{\}"}{appObj.setBackslash(false);});//fix this, first part shouldn't be a command
+<commandOP> = (<fraction>|<exponent>|<integral>|<d>){this.$value = $.$value}{this.termTest = "false"}{this.Return = "false"}{appObj.IsTerm(this.termTest);appObj.IsReturn(this.Return);};
+
+
+/**/

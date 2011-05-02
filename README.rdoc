@@ -1,0 +1,23 @@
+== Speech Recognition of Math Equations: Welcome!
+
+This project uses an open-source tool, {CMU Sphinx}[http://cmusphinx.sourceforge.net/], and adapts it in order to use it for speech recognition of math equations. That is, the speaker says math equations, and this project recognizes the speech and converts it to Latex, ready for display to the user
+
+= Running the project
+
+Not all files are listed, like dependent libraries. Get the complete project from {CMU Sphinx}[http://cmusphinx.sourceforge.net/] and pull this project while you're in the sphinx4-1.0beta5 directory. Many files will be replaced.
+
+We are currently working on sphinx4-1.0beta5/src/apps/edu/cmu/sphinx/demo/math. To run this, from the command line:
+	ant -find demo.xml
+	java -mx200m -jar bin/Math.jar
+
+
+= Original Readme File
+
+Copyright 1999-2010 Carnegie Mellon University.
+Portions Copyright 2006-2008 Sun Microsystems, Inc.
+Portions Copyright 2006-2008 Mitsubishi Electric Research Laboratories.
+All Rights Reserved.  Use is subject to license terms.
+
+See the file "license.terms" for information on usage and
+redistribution of this file, and for a DISCLAIMER OF ALL
+WARRANTIES.

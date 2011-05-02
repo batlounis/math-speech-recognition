@@ -1,0 +1,73 @@
+#JSGF V1.0;
+
+grammar edu.cmu.sphinx.demo.jsapi.math.math_New;
+
+/***** NUMBERS AND VARIABLES *******/
+<0to9> = one {this.$value = "1"}
+	| two {this.$value = "2"}
+	| three {this.$value = "3"}
+	| four {this.$value = "4"}
+	| five {this.$value = "5"}
+	| six {this.$value = "6"}
+	| seven {this.$value = "7"}
+	| eight {this.$value = "8"}
+	| nine {this.$value = "9"}
+	| zero {this.$value = "0"};
+
+<10to19> = Ten {this.$value = "10"}
+	| eleven {this.$value = "11"}
+	| twelve {this.$value = "12"}
+	| thirteen {this.$value = "13"}
+	| fourteen {this.$value = "14"}
+	| fifteen {this.$value = "15"}
+	| sixteen {this.$value = "16"}
+	| seventeen {this.$value = "17"}
+	| eighteen {this.$value = "18"}
+	| nineteen {this.$value = "19"};
+<tens> = twenty {this.$value = "2"}
+	| thirty {this.$value = "3"}
+	| forty {this.$value = "4"}
+	| fifty {this.$value = "5"}
+	| sixty {this.$value = "6"}
+	| seventy {this.$value = "7"}
+	| eighty {this.$value = "8"}
+	| ninety {this.$value = "9"};
+<20to99> = <tens> {this.$value = $tens.$value + "0"}
+	| <tens><0to9> {this.$value = $tens.$value + $0to9.$value};
+
+<number> = <0to9> {this.$value = $0to9.$value}| <10to19> {this.$value = $10to19.$value}| <20to99>{this.$value = $20to99.$value};
+<variable> = a | b | c | f | x | y | z;
+<nv> = ((<number>|<variable>){this.$value = $.$value}
+	|<number><variable>{this.$value = $.$value}){appObj.setLCL(this.$value);};
+
+/********* END OF NUMBERS & VARIABLES ************************/
+/*************************************************************/
+/********* SIMPLE OPERATIONS *********************************/
+
+<plus> = plus {this.$value = "+"};
+<division> = over | divided by;
+<operation> = to the {this.$value = "^"}| to the power {this.$value = "^"}| minus {this.$value = "-"} | times {this.$value = "*"};
+<inverse_square_cube> = inverse{this.$value = "^\{-1\}"} |squared {this.$value = "^2"}| cubed {this.$value = "^3"};
+
+/********** END OF SIMPLE OPERATIONS ************************/
+/************************************************************/
+/********** SIMPLE TERMS ************************************/
+<divTerm> = <nv>{this.nv1 = $.$value}<division><nv>{this.$value = "%frac\{" + this.nv1 + "\}\{" + $.$value + "\}"}{appObj.setLCL(this.$value);};
+	//number
+<term> = ((<nv>|<divTerm>) {this.$value = $.$value}
+	//[number] plus [number] -- an operation can be said on its own
+	|((<plus>|<operation>){this.$value = $.$value} (<nv>|<divTerm>){this.$value = this.$value + $.$value})((<plus>|<operation>){this.$value =this.$value + $.$value} (<nv>|<divTerm>){this.$value = this.$value + $.$value})*
+	|(<nv>|<divTerm>){this.$value = $.$value}((<plus>|<operation>){this.$value = this.$value + $.$value} (<nv>|<divTerm>){this.$value = this.$value + $.$value})+
+	//If nothing is said after times, minus, to the power, the program brackets the next term	
+	|(<nv>|<divTerm>){this.$value = $.$value} <operation>{this.$value = this.$value + $.$value +"("}{appObj.setAB(true);}
+	|(<operation>|<plus>){this.$value = $.$value} ((<nv>|<divTerm>){this.$value = this.$value + $.$value}<operation>{this.$value = this.$value + $.$value})+{this.$value = this.$value + "("}{appObj.setAB(true,this.$value);}){appObj.setAllowLCL(true);};
+
+<dividePrev> = <division>{appObj.setFtLength(9);}{appObj.setAllowLCL(false);}<term>{appObj.handleDivision($.$value);}{appObj.updateLCL();};
+/********** END SIMPLE TERMS ********************************/
+<return> = go back;
+<done> = (done|skip){appObj.skip();};
+public <equation> = <term>{appObj.addAtCursor($.$value);}{appObj.setCase("equation");}
+	|<operation>{appObj.addAtCursor($.$value + "(");appObj.setAB(true);}{appObj.setCase("operation");}
+	|<return>{appObj.goBack();}{appObj.setCase("return");}
+	|(<dividePrev>|<division>{appObj.handleDivision("");}){appObj.setCase("dividePrev");}
+	|<done>;
