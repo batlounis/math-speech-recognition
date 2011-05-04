@@ -36,9 +36,9 @@ grammar edu.cmu.sphinx.demo.jsapi.math.math_New;
 	| <tens><0to9> {this.$value = $tens.$value + $0to9.$value};
 
 <number> = <0to9> {this.$value = $0to9.$value}| <10to19> {this.$value = $10to19.$value}| <20to99>{this.$value = $20to99.$value};
-<variable> = a | b | c | f | x | y | z;
+<variable> = a | b | c | d | f | x | y | z;
 <nv> = ((<number>|<variable>){this.$value = $.$value}
-	|<number><variable>{this.$value = $.$value}){appObj.setLCL(this.$value);};
+	|<number><variable>{this.$value = $.$value});
 
 /********* END OF NUMBERS & VARIABLES ************************/
 /*************************************************************/
@@ -46,29 +46,95 @@ grammar edu.cmu.sphinx.demo.jsapi.math.math_New;
 
 <plus> = plus {this.$value = "+"};
 <division> = over | divided by;
-<operation> = to the {this.$value = "^"}| to the power {this.$value = "^"}| minus {this.$value = "-"} | times {this.$value = "*"};
+<operation> =  minus {this.$value = "-"} | times {this.$value = "*"}|plus {this.$value = "+"};
 <inverse_square_cube> = inverse{this.$value = "^\{-1\}"} |squared {this.$value = "^2"}| cubed {this.$value = "^3"};
-
+<power> = (to the| to the power) {this.$value = "^"};
 /********** END OF SIMPLE OPERATIONS ************************/
 /************************************************************/
 /********** SIMPLE TERMS ************************************/
-<divTerm> = <nv>{this.nv1 = $.$value}<division><nv>{this.$value = "%frac\{" + this.nv1 + "\}\{" + $.$value + "\}"}{appObj.setLCL(this.$value);};
-	//number
-<term> = ((<nv>|<divTerm>) {this.$value = $.$value}
-	//[number] plus [number] -- an operation can be said on its own
-	|((<plus>|<operation>){this.$value = $.$value} (<nv>|<divTerm>){this.$value = this.$value + $.$value})((<plus>|<operation>){this.$value =this.$value + $.$value} (<nv>|<divTerm>){this.$value = this.$value + $.$value})*
-	|(<nv>|<divTerm>){this.$value = $.$value}((<plus>|<operation>){this.$value = this.$value + $.$value} (<nv>|<divTerm>){this.$value = this.$value + $.$value})+
-	//If nothing is said after times, minus, to the power, the program brackets the next term	
-	|(<nv>|<divTerm>){this.$value = $.$value} <operation>{this.$value = this.$value + $.$value +"("}{appObj.setAB(true);}
-	|(<operation>|<plus>){this.$value = $.$value} ((<nv>|<divTerm>){this.$value = this.$value + $.$value}<operation>{this.$value = this.$value + $.$value})+{this.$value = this.$value + "("}{appObj.setAB(true,this.$value);}){appObj.setAllowLCL(true);};
+/** SQRT **/
+<root> = (square root
+	|radical
+	|root){this.$value = "%sqrt\{\}"}[of];
+<rootTerm> = <root><simpleTerm>{this.$value = "%sqrt\{" + $.$value + "\}"};
+/** END SQRT **/
+/** FUNCTIONS **/
+<variableOf> = <variable> of {this.$value = $variable.$value + "()"};
+<functions> = <variable> of <simpleTerm>{this.$value = $variable + "(" + $simpleTerm.$value + ")"};
+/** End **/
+//REDO ACCORDING TO ORDER OF OPERATION
+<divTerm> = <nv>{this.nv1 = $.$value}<division><nv>{this.$value = "%frac\{" + this.nv1 + "\}\{" + $.$value + "\}"}
+		|<nv>{this.nv1 = $.$value}<division><simpleTerm>{this.$value = "%frac\{" + this.nv1 + "\}\{" + $.$value + "\}"};
 
-<dividePrev> = <division>{appObj.setFtLength(9);}{appObj.setAllowLCL(false);}<term>{appObj.handleDivision($.$value);}{appObj.updateLCL();};
+<powerTerm> = <nv>{this.$value = $.$value}<power>{this.$value = this.$value + $.$value}<simpleTerm>
+		{this.$value = this.$value + "\{"+ $.$value + "\}"};
+
+<simpleTerm> = (<divTerm>|<powerTerm>|<nv>|<rootTerm>|<functions>){this.$value = $.$value;}
+		|<nv>{this.$value = $.$value;}<operation>{this.$value = this.$value + $.$value;}
+		<nv>{this.$value = this.$value + $.$value;};
+	
+	//number
+<term> = [of{appObj.ofSkip()}]((<simpleTerm> {this.$value = $.$value}//the of is added in case the term comes after an integral or summation or sth
+	//[number] plus [number] -- an operation can be said on its own
+	|(<plus>|<operation>){this.$value = $.$value} (<simpleTerm>){this.$value = this.$value + $.$value})((<plus>|<operation>){this.$value 
+	=this.$value + $.$value} (<simpleTerm>){this.$value = this.$value + $.$value})*
+	|(<simpleTerm>){this.$value = $.$value}((<plus>|<operation>){this.$value = this.$value + $.$value} (<simpleTerm>){this.$value = this.
+	$value + $.$value})+
+	//If nothing is said after times, minus, to the power, the program brackets the next term	
+	|((<simpleTerm>){this.$value = $.$value} <operation>{this.$value = this.$value + $.$value})+
+	|(<operation>|<plus>){this.$value = $.$value} ((<simpleTerm>){this.$value = this.$value + $.$value}(<operation>|<plus>){this.$value = 
+	this.$value + $.$value})+);
+//NOTE: A OVER
+//divide already written term with a term
+<dividePrev> = <division><term>{appObj.handleDivision($term.$value);};
+//raise to the power already written term with a power
+<raiseToThePower> = <power><term>{appObj.handlePower($term.$value);};
 /********** END SIMPLE TERMS ********************************/
-<return> = go back;
+/** INTEGRAL **///CAREFUL FOR SPACE DIRECTLY FOLLOWING THE INTEGRAL
+<boundedIntegral> = bounded integral{this.$value = "%int_\{\}^\{\}"}{appObj.boundedIntegral(this.$value);};
+<integralOf> = (integral [of]){this.$value = "%int "};
+<simpleIntegralTerm> = integral{this.$value = "%int"} <Bounds>{this.$value = this.$value + $.$value}[of];
+<integralTerm> = (<integralOf>|<simpleIntegralTerm>){this.$value = $.$value} <term> {this.$value = this.$value + $.$value}
+			[d <term>{this.$value = this.$value + "d" + $.$value}];
+/** SUMMATION **/
+<boundedSum> = bounded (sum|summation){this.$value = "%displaystyle%sum%limits_\{\}^\{\}"}{appObj.boundedIntegral(this.$value);};
+<sumOf> = ((sum|summation) [of]){this.$value = "%displaystyle%sum%limits "};
+<simpleSumTerm> = (sum|summation){this.$value = "%displaystyle%sum%limits"} <Bounds>{this.$value = this.$value + $.$value}[of];
+<sumTerm> = (<sumOf>|<simpleIntegralTerm>){this.$value = $.$value} <term> {this.$value = this.$value + $.$value};
+
+/** BOUNDS **/
+<Bounds> = from <term>{appObj.from($.$value);}[to <term> 
+		{appObj.to($.$value);}]
+		|to <term> {appObj.to($.$value);};
+
+<from> = from {appObj.from("");};
+//<fromTerm> = from term{appObj.from("");};
+<to> = to {appObj.to("");};
+//<toTerm> = to term{appObj.to("");};
+/**************/
+/** BRACKETS **/
+<openBracket> = (open | open bracket){this.$value = "("}{appObj.addAtCursor(this.$value);}| open brackets {appObj.addBrackets();};
+<closebracket> = (close| close bracket){this.$value = ")"}{appObj.addAtCursor(this.$value);}| close everything{appObj.closeEverything();};
+<brackets> = <openBracket>|<closebracket>;
+/** END BRACKETS **/
+<return> = go back|undo;
 <testing> = hello;
-<done> = (done|skip){appObj.skip();};
-public <equation> = <term>{appObj.addAtCursor($.$value);}{appObj.setCase("equation");}
-	|<operation>{appObj.addAtCursor($.$value + "(");appObj.setAB(true);}{appObj.setCase("operation");}
-	|<return>{appObj.goBack();}{appObj.setCase("return");}
-	|(<dividePrev>|<division>{appObj.handleDivision("");}){appObj.setCase("dividePrev");}
-	|<done>|<testing>;
+<done> = (done|skip){appObj.skip();}|of{appObj.ofSkip()};
+
+public <equation> = (<term>{appObj.addAtCursor($.$value);}
+	|<operation>{appObj.addAtCursor($.$value)}
+	|(<dividePrev>|<division>{appObj.handleDivision("");})
+	|[<operation>{appObj.addAtCursor($.$value)}](<root>|<variableOf>){appObj.addRoot($.$value);}	
+	|<done>
+	|<brackets>
+	|<raiseToThePower>|<power>{appObj.handlePower("");}
+	|<boundedIntegral>
+	|[<operation>{appObj.addAtCursor($.$value)}](<simpleIntegralTerm>{appObj.addAtCursor($.$value);}
+	|(<integralTerm>|<integralOf>){appObj.addAtCursor($.$value);})
+	|[<operation>{appObj.addAtCursor($.$value)}](<simpleSumTerm>{appObj.addAtCursor($.$value);}
+	|(<sumTerm>|<sumOf>){appObj.addAtCursor($.$value);})
+	|<from>
+	|<to>
+	|<Bounds>){appObj.setAddUtterance(true);}
+	|<return>{appObj.undo(1);}
+	|<testing>;

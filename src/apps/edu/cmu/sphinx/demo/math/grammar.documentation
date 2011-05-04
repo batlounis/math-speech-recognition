@@ -1,0 +1,97 @@
+//Grammar documentation
+
+* The equation is stored as a string in "Equation"
+* "Cursor" is an integer which points to where the next term will be inserted
+  "Cursor" can be changed by the user
+* Every utterance invokes a function which modifies "Equation" & "Cursor"
+	Note: it is the job of the functions to make sure that "Equation" can always be compiled to latex
+		also, the grammar file is only used for recognition, no structure is derived out of it in
+		relation to the overall equation. Reasons for this: grammar for recognition is different
+		than the math grammar: example "one over two". In math terms, it's a division operator which
+		takes two parameters. In recognition: "two" points to "over" which points to "one", i.e. it's
+		only concerned with what can be said before and after.
+* Anything can be said as long as "Equation" can be compiled
+
+
+NUMBERS - VARIABLES - SIMPLE OPERATORS (plus, minus, times)
+for all of these, their value is simply inserted at Cursor location and the cursor is respectively shifted
+
+Division
+In latex, division is denoted by \frac{}{}
+case1: if we say: <term1><division><term2>: \frac{term1}{term2} is inserted at cursor position and the cursor 
+is relocated to after the fraction term
+case2: if we say <divison> or <division><term>: the program needs to check what will the numerator be:
+	if the cursor is located at a bracket then it'll take the entire bracketed term
+	if it's located after a function, example after another fraction or after f(x) then it'll take
+	all of that to be the numerator.
+	Otherwise it'll just take the last number or variable as the numerator
+	The numerator is found by parsing the string: i.e. if the cursor is located at a closing bracket, it
+	calls a function to find the corresponding opening bracket & then checks if it's a function or just
+	brackets.
+	The same is done for functions with parameters i.e. such as \frac{}{}. The corresponding opening curly
+	braces are found as well as the preceding function ex"\frac"
+case3: if the denomenator is not specified, the cursor is placed inside the denomenator position and stays there
+	untill the user calls skip or done or manually gets out of it.
+
+Power
+term to the power term.. inserted normally
+term to the power: ^{cursor placed here} and doesn't get out untill skip is called or it is manually changed
+
+square root
+ sqrt term
+or sqrt
+functions exactly the same as power
+
+functions
+variable of: example f() & cursor is placed inside the brackets
+variable of term: f(term) & cursor is placed outside
+
+Integral & Summation
+<boundedIntegral> = bounded integral: add integral with bounds to the equation and sets the cursor at the lower bound
+<integralOf> = (integral [of]) adds the integral with no bounds
+<simpleIntegralTerm> = integral <Bounds> [of]; adds integral with specified bounds and the cursor now waits for the function: int from a to b of..
+<integralTerm> = (<integralOf>|<simpleIntegralTerm>) <term>[d <term>]; same as above but the term to be integrated is also specified
+
+/** SUMMATION **/ WORKS EXACTLY THE SAME AS INTEGRAL
+/** BOUNDS **/
+<Bounds> = from <term>[to <term>]
+		|to <term>; if no bounds were specified, ex you just said integral, you can specify them again. Just say from.. to..
+		If you're at some random location in the equation, saying from sth to sth won't do anything. The function which adds this
+		checks if it's following a summation or integral or sth that could have bounds
+
+<from> = from {appObj.from("");}; Also checks if it's following a sum or integral, adds an empty bound and waits the user to insert sth
+<to> = to {appObj.to("");};Same as above, but if you're in the lower bound it'll automatically take you to the upper bound
+of: if you're in a bound an say "of" or "of ..." this automatically gets you out of the bounds. Otherwise it won't do anything
+
+
+Utterance List, Undo & recompile
+
+Every utterance (except undo) said is added to an utterance list, also, when a cursor is manually changed, the change will be add in the utterance list (yet to be implemented but should be easy since we already have the cursor output position when ever it is changed).
+When the user says undo, the last utterance from the list is deleted and the list is recompiled. => we can go back as many steps as we wish even if we manually change the cursor.
+Note: if undo seems a little slow, it's not! It's just that at every utterance i'm outputting stuff to check in things are working properly, so when undo is called it re-outputs them and the equation doesn't change until all of them are outputed.
+
+Things to be added:
+limits
+equal
+for all
+product (prob will be exactly the same as integral and summation)
+trigonometric functions
+
+Those shouldn't be too much trouble
+
+Assumption program makes:
+Order of operation
+a plus b over c: a + c/b
+a over b plus c: a/b + c
+a over ... b plus c: a/(b+c)
+
+grouping starts from left
+root x over y: root(x/y)
+x over root y: x/root(y)
+root x .... over y: root(x)/y
+
+
+
+
+
+
